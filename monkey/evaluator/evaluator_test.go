@@ -8,6 +8,119 @@ import (
 	"github.com/515hikaru/monkey-go/monkey/parser"
 )
 
+func TestBuiltinPushArrayExpressions(t *testing.T) {
+	input := "push([1, 2, 3, 4], 5)"
+	evaluated := testEval(input)
+	result, ok := evaluated.(*object.Array)
+	if !ok {
+		t.Fatalf("object is not Array. got=%T (%+v", evaluated, evaluated)
+	}
+
+	if len(result.Elements) != 5 {
+		t.Fatalf("array has wrong num of elements. got=%d", len(result.Elements))
+	}
+
+	testIntegerObject(t, result.Elements[0], int64(1))
+	testIntegerObject(t, result.Elements[1], int64(2))
+	testIntegerObject(t, result.Elements[2], int64(3))
+	testIntegerObject(t, result.Elements[3], int64(4))
+	testIntegerObject(t, result.Elements[4], int64(5))
+
+}
+
+func TestBuiltinRestArrayExpressions(t *testing.T) {
+	input := "rest([1, 2, 3, 4])"
+	evaluated := testEval(input)
+	result, ok := evaluated.(*object.Array)
+	if !ok {
+		t.Fatalf("object is not Array. got=%T (%+v", evaluated, evaluated)
+	}
+
+	if len(result.Elements) != 3 {
+		t.Fatalf("array has wrong num of elements. got=%d", len(result.Elements))
+	}
+
+	testIntegerObject(t, result.Elements[0], int64(2))
+	testIntegerObject(t, result.Elements[1], int64(3))
+	testIntegerObject(t, result.Elements[2], int64(4))
+}
+
+func TestArrayIndexExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{
+			"[1, 2, 3][0]",
+			1,
+		},
+		{
+			"[1, 2, 3][1]",
+			2,
+		},
+		{
+			"[1, 2, 3][2]",
+			3,
+		},
+		{
+			"let i = 0; [1][i];",
+			1,
+		},
+		{
+			"[1, 2, 3][1 + 1]",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[2]",
+			3,
+		},
+		{
+			"let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2]",
+			6,
+		},
+		{
+			"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];",
+			2,
+		},
+		{
+			"[1, 2, 3][3]",
+			nil,
+		},
+		{
+			"[1, 2, 3][-1]",
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+
+		integer, ok := tt.expected.(int)
+		if ok {
+			testIntegerObject(t, evaluated, int64(integer))
+		} else {
+			testNullObject(t, evaluated)
+		}
+	}
+}
+
+func TestArrayLiterals(t *testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+
+	evaluated := testEval(input)
+	result, ok := evaluated.(*object.Array)
+	if !ok {
+		t.Fatalf("object is not Array. got=%T (%+v", evaluated, evaluated)
+	}
+
+	if len(result.Elements) != 3 {
+		t.Fatalf("array has wrong num of elements. got=%d", len(result.Elements))
+	}
+
+	testIntegerObject(t, result.Elements[0], int64(1))
+	testIntegerObject(t, result.Elements[1], int64(4))
+	testIntegerObject(t, result.Elements[2], int64(6))
+}
 func TestBuiltinFunction(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -18,6 +131,20 @@ func TestBuiltinFunction(t *testing.T) {
 		{`len("hello,world")`, 11},
 		{`len(1)`, "argument to `len` not supported, got=INTEGER"},
 		{`len("one", "two")`, "wrong number of arguments. got=2, want=1"},
+		{`first([1])`, 1},
+		{`first([100, 32, 56, 45])`, 100},
+		{`first([])`, nil},
+		{`first([], [])`, "wrong number of arguments. got=2, want=1"},
+		{`first(1)`, "argument to `first` must be ARRAY, got INTEGER"},
+		{`last([])`, nil},
+		{`last([1])`, 1},
+		{`last([100, 32, 56, 45])`, 45},
+		{`last([], [])`, "wrong number of arguments. got=2, want=1"},
+		{`last(1)`, "argument to `last` must be ARRAY, got INTEGER"},
+		{`rest(1)`, "argument to `rest` must be ARRAY, got INTEGER"},
+		{`rest([], [])`, "wrong number of arguments. got=2, want=1"},
+		{`push(1, 1)`, "argument to `push` must be ARRAY, got INTEGER"},
+		{`push([])`, "wrong number of arguments. got=1, want=2"},
 	}
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
@@ -35,6 +162,8 @@ func TestBuiltinFunction(t *testing.T) {
 			if errObj.Message != expected {
 				t.Errorf("wrong error message. expected=%q, got=%q", expected, errObj.Message)
 			}
+		default:
+			testNullObject(t, evaluated)
 		}
 	}
 }
@@ -355,7 +484,6 @@ func testEval(input string) object.Object {
 
 func testIntegerObject(t *testing.T, obj object.Object, expected int64) bool {
 	result, ok := obj.(*object.Integer)
-
 	if !ok {
 		t.Errorf("object is not Integer. got=%T(%+v)", obj, obj)
 		return false
