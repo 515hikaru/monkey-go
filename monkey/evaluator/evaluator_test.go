@@ -8,6 +8,30 @@ import (
 	"github.com/515hikaru/monkey-go/monkey/parser"
 )
 
+func TestDefineMap(t *testing.T) {
+	input := `
+	let map = fn(arr, f) { let iter = fn(arr, acc) { if (len(arr) == 0) { acc } else {iter(rest(arr), push(acc, f(first(arr))))}};iter(arr, []);};
+	let a = [1, 2, 3, 4];
+	let double = fn(x) { x * 2 };
+	map(a, double)
+	`
+	evaluated := testEval(input)
+	result, ok := evaluated.(*object.Array)
+
+	if !ok {
+		t.Fatalf("object is not Array. got=%T (%+v", evaluated, evaluated)
+	}
+
+	if len(result.Elements) != 4 {
+		t.Fatalf("array has wrong num of elements. got=%d", len(result.Elements))
+	}
+
+	testIntegerObject(t, result.Elements[0], int64(2))
+	testIntegerObject(t, result.Elements[1], int64(4))
+	testIntegerObject(t, result.Elements[2], int64(6))
+	testIntegerObject(t, result.Elements[3], int64(8))
+}
+
 func TestBuiltinPushArrayExpressions(t *testing.T) {
 	input := "push([1, 2, 3, 4], 5)"
 	evaluated := testEval(input)
